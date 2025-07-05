@@ -26,7 +26,6 @@
 #include <array>
 #include <climits>
 #include <cstdint>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -48,6 +47,10 @@ namespace Esterv::Utils::QrGen {
 
 class QrSegment final {
 
+  /* The set of all legal characters in alphanumeric mode, where
+   * each character value maps to the index in the string. */
+    static const char *alphanumeric_charset;
+
   /*---- Public helper enumeration ----*/
 
   /*
@@ -56,37 +59,19 @@ class QrSegment final {
 public:
   class Mode final {
 
-    /*-- Constants --*/
-
-  public:
-    static const Mode NUMERIC;
-
-  public:
-    static const Mode ALPHANUMERIC;
-
-  public:
-    static const Mode BYTE;
-
-  public:
-    static const Mode KANJI;
-
-  public:
-    static const Mode ECI;
-
-    /*-- Fields --*/
-
-    // The mode indicator bits, which is a uint4 value (range 0 to 15).
-  private:
-    int modeBits;
-
+     // The mode indicator bits, which is a uint4 value (range 0 to 15).
+    int mode_bits_;
     // Number of character count bits for three different version ranges.
-  private:
-    int numBitsCharCount[3];
-
+    const std::array<int,3> k_num_bits_char_count;
     /*-- Constructor --*/
-
-  private:
     Mode(int mode, int cc0, int cc1, int cc2);
+  
+  public:
+    static const Mode k_numeric;
+    static const Mode k_alphanumeric;
+    static const Mode k_byte;
+    static const Mode k_kanji;
+    static const Mode k_eci;
 
     /*-- Methods --*/
 
@@ -94,16 +79,16 @@ public:
      * (Package-private) Returns the mode indicator bits, which is an unsigned
      * 4-bit value (range 0 to 15).
      */
-  public:
-    int getModeBits() const;
+    [[nodiscard]] auto getModeBits() const { return mode_bits_; };
 
     /*
      * (Package-private) Returns the bit width of the character count field for
      * a segment in this mode in a QR Code at the given version number. The
      * result is in the range [0, 16].
      */
-  public:
-    int numCharCountBits(int ver) const;
+    [[nodiscard]] auto numCharCountBits(int ver) const {
+        return k_num_bits_char_count[(ver + 7) / 17];
+  }
   };
 
   /*---- Static factory functions (mid level) ----*/
@@ -113,15 +98,14 @@ public:
    * byte mode. All input byte vectors are acceptable. Any text string
    * can be converted to UTF-8 bytes and encoded as a byte mode segment.
    */
-public:
-  static QrSegment makeBytes(const std::vector<std::uint8_t> &data);
+
+  static auto makeBytes(const std::vector<std::uint8_t> &data)-> QrSegment;
 
   /*
    * Returns a segment representing the given string of decimal digits encoded
    * in numeric mode.
    */
-public:
-  static QrSegment makeNumeric(const char *digits);
+  static auto makeNumeric(const char *digits)-> QrSegment;
 
   /*
    * Returns a segment representing the given text string encoded in
@@ -129,23 +113,20 @@ public:
    * only), space, dollar, percent, asterisk, plus, hyphen, period, slash,
    * colon.
    */
-public:
-  static QrSegment makeAlphanumeric(const char *text);
+  static auto makeAlphanumeric(const char *text)-> QrSegment;
 
   /*
    * Returns a list of zero or more segments to represent the given text string.
    * The result may use various segment modes and switch modes to optimize the
    * length of the bit stream.
    */
-public:
-  static std::vector<QrSegment> makeSegments(const char *text);
+  static auto makeSegments(const char *text) -> std::vector<QrSegment>;
 
   /*
    * Returns a segment representing an Extended Channel Interpretation
    * (ECI) designator with the given assignment value.
    */
-public:
-  static QrSegment makeEci(long assignVal);
+  static auto makeEci(int64_t assignVal)-> QrSegment;
 
   /*---- Public static helper functions ----*/
 
@@ -153,8 +134,7 @@ public:
    * Tests whether the given string can be encoded as a segment in numeric mode.
    * A string is encodable iff each character is in the range 0 to 9.
    */
-public:
-  static bool isNumeric(const char *text);
+  static auto isNumeric(const char *text) -> bool;
 
   /*
    * Tests whether the given string can be encoded as a segment in alphanumeric
@@ -162,25 +142,22 @@ public:
    * to 9, A to Z (uppercase only), space, dollar, percent, asterisk, plus,
    * hyphen, period, slash, colon.
    */
-public:
-  static bool isAlphanumeric(const char *text);
+  static auto isAlphanumeric(const char *text) -> bool;
 
   /*---- Instance fields ----*/
 
   /* The mode indicator of this segment. Accessed through getMode(). */
 private:
-  const Mode *mode;
+  const Mode *mode_;
 
   /* The length of this segment's unencoded data. Measured in characters for
    * numeric/alphanumeric/kanji mode, bytes for byte mode, and 0 for ECI mode.
    * Always zero or positive. Not the same as the data's bit length.
    * Accessed through getNumChars(). */
-private:
-  int numChars;
+  int m_num_chars;
 
   /* The data bits of this segment. Accessed through getData(). */
-private:
-  std::vector<bool> data;
+  std::vector<bool> m_data;
 
   /*---- Constructors (low level) ----*/
 
@@ -199,7 +176,6 @@ public:
    * length, but the constraint isn't checked. The given bit buffer is moved and
    * stored.
    */
-public:
   QrSegment(const Mode &md, int numCh, std::vector<bool> &&dt);
 
   /*---- Methods ----*/
@@ -207,34 +183,24 @@ public:
   /*
    * Returns the mode field of this segment.
    */
-public:
-  const Mode &getMode() const;
+  [[nodiscard]] const Mode &getMode() const;
 
   /*
    * Returns the character count field of this segment.
    */
-public:
-  int getNumChars() const;
+  [[nodiscard]] int getNumChars() const;
 
   /*
    * Returns the data bits of this segment.
    */
-public:
-  const std::vector<bool> &getData() const;
+  [[nodiscard]] auto getData() const -> const std::vector<bool> & { return m_data; }
 
   // (Package-private) Calculates the number of bits needed to encode the given
   // segments at the given version. Returns a non-negative number if successful.
   // Otherwise returns -1 if a segment has too many characters to fit its length
   // field, or the total bits exceeds INT_MAX.
-public:
-  static int getTotalBits(const std::vector<QrSegment> &segs, int version);
-
-  /*---- Private constant ----*/
-
-  /* The set of all legal characters in alphanumeric mode, where
-   * each character value maps to the index in the string. */
-private:
-  static const char *ALPHANUMERIC_CHARSET;
+  static auto getTotalBits(const std::vector<QrSegment> &segs, int version) -> int;
+  
 };
 
 /*
@@ -264,7 +230,7 @@ class QrCode final {
    * The error correction level in a QR Code symbol.
    */
 public:
-  enum class Ecc {
+  enum class Ecc: std::uint8_t {
     LOW = 0,  // The QR Code can tolerate about  7% erroneous codewords
     MEDIUM,   // The QR Code can tolerate about 15% erroneous codewords
     QUARTILE, // The QR Code can tolerate about 25% erroneous codewords
@@ -273,7 +239,7 @@ public:
 
   // Returns a value in the range 0 to 3 (unsigned 2-bit integer).
 private:
-  static int getFormatBits(Ecc ecl);
+  static auto getFormatBits(Ecc ecl) -> int;
 
   /*---- Static factory functions (high level) ----*/
 
@@ -287,7 +253,7 @@ private:
    * be done without increasing the version.
    */
 public:
-  static QrCode encodeText(const char *text, Ecc ecl);
+  static auto encodeText(const char *text, Ecc ecl) -> QrCode;
 
   /*
    * Returns a QR Code representing the given binary data at the given error
@@ -297,8 +263,7 @@ public:
    * The ECC level of the result may be higher than the ecl argument if it can
    * be done without increasing the version.
    */
-public:
-  static QrCode encodeBinary(const std::vector<std::uint8_t> &data, Ecc ecl);
+  static auto encodeBinary(const std::vector<std::uint8_t> &data, Ecc ecl) -> QrCode;
 
   /*---- Static factory functions (mid level) ----*/
 
@@ -314,7 +279,6 @@ public:
    * alphanumeric and byte) to encode text in less space. This is a mid-level
    * API; the high-level API is encodeText() and encodeBinary().
    */
-public:
   static QrCode encodeSegments(const std::vector<QrSegment> &segs, Ecc ecl,
                                int minVersion = 1, int maxVersion = 40,
                                int mask = -1,
@@ -327,34 +291,29 @@ public:
   /* The version number of this QR Code, which is between 1 and 40 (inclusive).
    * This determines the size of this barcode. */
 private:
-  int version;
+  int m_version;
 
   /* The width and height of this QR Code, measured in modules, between
    * 21 and 177 (inclusive). This is equal to version * 4 + 17. */
-private:
-  int size;
+  int m_size;
 
   /* The error correction level used in this QR Code. */
-private:
-  Ecc errorCorrectionLevel;
+  Ecc m_errorCorrectionLevel;
 
   /* The index of the mask pattern used in this QR Code, which is between 0 and
    * 7 (inclusive). Even if a QR Code is created with automatic masking
    * requested (mask = -1), the resulting object still has a mask value between
    * 0 and 7. */
-private:
   int mask;
 
   // Private grids of modules/pixels, with dimensions of size*size:
 
   // The modules of this QR Code (false = light, true = dark).
   // Immutable after constructor finishes. Accessed through getModule().
-private:
   std::vector<std::vector<bool>> modules;
 
   // Indicates function modules that are not subjected to masking. Discarded
   // when constructor finishes.
-private:
   std::vector<std::vector<bool>> isFunction;
 
   /*---- Constructor (low level) ----*/
@@ -374,25 +333,21 @@ public:
   /*
    * Returns this QR Code's version, in the range [1, 40].
    */
-public:
-  int getVersion() const;
+  [[nodiscard]] auto getVersion() const { return m_version; }
 
   /*
    * Returns this QR Code's size, in the range [21, 177].
    */
-public:
   int getSize() const;
 
   /*
    * Returns this QR Code's error correction level.
    */
-public:
   Ecc getErrorCorrectionLevel() const;
 
   /*
    * Returns this QR Code's mask, in the range [0, 7].
    */
-public:
   int getMask() const;
 
   /*
@@ -401,7 +356,6 @@ public:
    * (x=0, y=0). If the given coordinates are out of bounds, then false (light)
    * is returned.
    */
-public:
   bool getModule(int x, int y) const;
 
   /*---- Private helper methods for constructor: Drawing function modules ----*/
@@ -413,32 +367,26 @@ private:
 
   // Draws two copies of the format bits (with its own error correction code)
   // based on the given mask and this object's error correction level field.
-private:
   void drawFormatBits(int msk);
 
   // Draws two copies of the version bits (with its own error correction code),
   // based on this object's version field, iff 7 <= version <= 40.
-private:
   void drawVersion();
 
   // Draws a 9*9 finder pattern including the border separator,
   // with the center module at (x, y). Modules can be out of bounds.
-private:
   void drawFinderPattern(int x, int y);
 
   // Draws a 5*5 alignment pattern, with the center module
   // at (x, y). All modules must be in bounds.
-private:
   void drawAlignmentPattern(int x, int y);
 
   // Sets the color of a module and marks it as a function module.
   // Only used by the constructor. Coordinates must be in bounds.
-private:
   void setFunctionModule(int x, int y, bool isDark);
 
   // Returns the color of the module at the given coordinates, which must be in
   // range.
-private:
   bool module(int x, int y) const;
 
   /*---- Private helper methods for constructor: Codewords and masking ----*/
@@ -446,14 +394,12 @@ private:
   // Returns a new byte string representing the given data with the appropriate
   // error correction codewords appended to it, based on this object's version
   // and error correction level.
-private:
   std::vector<std::uint8_t>
   addEccAndInterleave(const std::vector<std::uint8_t> &data) const;
 
   // Draws the given sequence of 8-bit codewords (data and error correction)
   // onto the entire data area of this QR Code. Function modules need to be
   // marked off before this is called.
-private:
   void drawCodewords(const std::vector<std::uint8_t> &data);
 
   // XORs the codeword modules in this QR Code with the given mask pattern.
@@ -461,13 +407,11 @@ private:
   // before masking. Due to the arithmetic of XOR, calling applyMask() with
   // the same mask value a second time will undo the mask. A final well-formed
   // QR Code needs exactly one (not zero, two, etc.) mask applied.
-private:
   void applyMask(int msk);
 
   // Calculates and returns the penalty score based on state of this QR Code's
   // current modules. This is used by the automatic mask choice algorithm to
   // find the mask pattern that yields the lowest score.
-private:
   long getPenaltyScore() const;
 
   /*---- Private helper functions ----*/
@@ -476,7 +420,6 @@ private:
   // version number. Each position is in the range [0,177), and are used on both
   // the x and y axes. This could be implemented as lookup table of 40
   // variable-length lists of unsigned bytes.
-private:
   std::vector<int> getAlignmentPatternPositions() const;
 
   // Returns the number of data bits that can be stored in a QR Code of the
@@ -484,53 +427,44 @@ private:
   // includes remainder bits, so it might not be a multiple of 8. The result is
   // in the range [208, 29648]. This could be implemented as a 40-entry lookup
   // table.
-private:
   static int getNumRawDataModules(int ver);
 
   // Returns the number of 8-bit data (i.e. not error correction) codewords
   // contained in any QR Code of the given version number and error correction
   // level, with remainder bits discarded. This stateless pure function could be
   // implemented as a (40*4)-cell lookup table.
-private:
   static int getNumDataCodewords(int ver, Ecc ecl);
 
   // Returns a Reed-Solomon ECC generator polynomial for the given degree. This
   // could be implemented as a lookup table over all possible parameter values,
   // instead of as an algorithm.
-private:
   static std::vector<std::uint8_t> reedSolomonComputeDivisor(int degree);
 
   // Returns the Reed-Solomon error correction codeword for the given data and
   // divisor polynomials.
-private:
   static std::vector<std::uint8_t>
   reedSolomonComputeRemainder(const std::vector<std::uint8_t> &data,
                               const std::vector<std::uint8_t> &divisor);
 
   // Returns the product of the two given field elements modulo GF(2^8/0x11D).
   // All inputs are valid. This could be implemented as a 256*256 lookup table.
-private:
   static std::uint8_t reedSolomonMultiply(std::uint8_t x, std::uint8_t y);
 
   // Can only be called immediately after a light run is added, and
   // returns either 0, 1, or 2. A helper function for getPenaltyScore().
-private:
   int finderPenaltyCountPatterns(const std::array<int, 7> &runHistory) const;
 
   // Must be called at the end of a line (row or column) of modules. A helper
   // function for getPenaltyScore().
-private:
   int finderPenaltyTerminateAndCount(bool currentRunColor, int currentRunLength,
                                      std::array<int, 7> &runHistory) const;
 
   // Pushes the given value to the front and drops the last value. A helper
   // function for getPenaltyScore().
-private:
   void finderPenaltyAddHistory(int currentRunLength,
                                std::array<int, 7> &runHistory) const;
 
   // Returns true iff the i'th bit of x is set to 1.
-private:
   static bool getBit(long x, int i);
 
   /*---- Constants and tables ----*/
@@ -540,26 +474,17 @@ public:
   static constexpr int MIN_VERSION = 1;
 
   // The maximum version number supported in the QR Code Model 2 standard.
-public:
   static constexpr int MAX_VERSION = 40;
 
   // For use in getPenaltyScore(), when evaluating which mask is best.
 private:
   static const int PENALTY_N1;
-
-private:
   static const int PENALTY_N2;
-
-private:
   static const int PENALTY_N3;
-
-private:
   static const int PENALTY_N4;
 
-private:
   static const std::int8_t ECC_CODEWORDS_PER_BLOCK[4][41];
 
-private:
   static const std::int8_t NUM_ERROR_CORRECTION_BLOCKS[4][41];
 };
 
@@ -601,7 +526,6 @@ public:
 
   // Appends the given number of low-order bits of the given value
   // to this buffer. Requires 0 <= len <= 31 and val < 2^len.
-public:
   void appendBits(std::uint32_t val, int len);
 };
 /*---- utils functions ----*/
@@ -611,6 +535,6 @@ public:
  * @return the svg string of the qr.
  *
  */
-std::string toSvgString(const QrCode &qr, std::string fill);
+std::string toSvgString(const QrCode &qr, const std::string& fill);
 
 } // namespace Esterv::Utils::QrGen

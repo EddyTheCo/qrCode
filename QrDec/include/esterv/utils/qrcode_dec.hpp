@@ -6,7 +6,7 @@ namespace Esterv::Utils::QrDec {
 class QRDecoder : public cv::QRCodeDetectorAruco {
 
 public:
-  QRDecoder(){};
-  std::string decode_grey(unsigned char *img, int rows, int cols);
+  QRDecoder()= default;
+  auto decodeGrey(unsigned char *img, int rows, int cols) -> std::string;
 };
 } // namespace Esterv::Utils::QrDec

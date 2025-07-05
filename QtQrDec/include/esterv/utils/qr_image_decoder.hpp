@@ -1,10 +1,17 @@
 #include <QBuffer>
 #include <QImage>
-#include <QObject>
+#include <QObject>  
 #include <QString>
-#include <QtQml/qqmlregistration.h>
 
+
+#include <cstdint>
+#include <memory>
+#include <qjsengine.h>
+#include <qqmlengine.h>
+#include <qqmlintegration.h>
 #include <qquickimageprovider.h>
+#include <qtdeprecationdefinitions.h>
+#include <qtmetamacros.h>
 
 #ifndef USE_EMSCRIPTEN
 #include <QCamera>
@@ -38,49 +45,49 @@ class DEC_EXPORT QRImageDecoder : public QObject {
   QML_ELEMENT
   QML_SINGLETON
 
-  QRImageDecoder(QObject *parent = nullptr);
+  explicit QRImageDecoder(QObject *parent = nullptr);
 
 public:
   ~QRImageDecoder() override {
     {
-      std::lock_guard lk(m_decoding_mutex);
-      m_decode_running = false;
+      const std::lock_guard k_lock(decoding_mutex_);
+      decode_running_ = false;
     }
-    m_decoding_variable.notify_one();
+    decoding_variable_.notify_one();
   }
-  static QRImageDecoder *instance();
-  static QRImageDecoder *create(QQmlEngine *qmlEngine, QJSEngine *jsEngine) {
+  static auto instance() -> QRImageDecoder *;
+  static auto create(QQmlEngine * /*qmlEngine*/, QJSEngine * /*jsEngine*/)-> QRImageDecoder * {
     return instance();
-  }
-  enum State { Decoding = 0, Ready };
+  } 
+  enum class State : std::uint8_t { Decoding = 0, Ready };
   Q_INVOKABLE void start();
   Q_INVOKABLE void stop();
   Q_INVOKABLE void clear();
-  QString get_source(void) const { return m_source; }
+  [[nodiscard]] auto get_source() const { return source_; }
 
   void reload(int offset, int width, int height);
-signals:
+Q_SIGNALS:
   void decodedQR(QString);
   void sourceChanged();
   void hasTorchChanged();
   void useTorchChanged();
 
 private:
-  State m_state{Ready};
-  std::mutex m_decoding_mutex;
-  std::condition_variable m_decoding_variable;
-  bool m_decode_running{true};
+  State state_{State::Ready};
+  std::mutex decoding_mutex_;
+  std::condition_variable decoding_variable_;
+  bool decode_running_{true};
 #ifndef USE_EMSCRIPTEN
-  QCamera *m_camera{nullptr};
-  QMediaCaptureSession *captureSession;
-  QVideoSink *videoSink;
-  void getCamera(void);
+  std::unique_ptr<QCamera> camera_;
+  std::unique_ptr<QMediaCaptureSession> capture_session_;
+  std::unique_ptr<QVideoSink> video_sink_;
+  void getCamera();
 #endif
   void setid();
   void decodePicture();
-  QString m_source;
-  QRDecoder detector;
-  bool m_useTorch{false}, m_hasTorch{false};
+  QString source_;
+  QRDecoder detector_;
+  bool use_torch_{false}, has_torch_{false};
 };
 
 class DEC_EXPORT WasmImageProvider : public QQuickImageProvider {
@@ -88,9 +95,8 @@ public:
   WasmImageProvider() : QQuickImageProvider(QQuickImageProvider::Image) {
     restart();
   }
-  QImage requestImage(const QString &id, QSize *size,
-                      const QSize &requestedSize) override;
-  static void restart(void);
+  auto requestImage(const QString & /*id*/, QSize * /*size*/, const QSize & /*requestedSize*/)->QImage override;
+  static void restart();
   static QImage img;
 };
 } // namespace Esterv::Utils::QrDec

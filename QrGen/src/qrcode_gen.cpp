@@ -26,10 +26,12 @@
 #include <cassert>
 #include <climits>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
 #include <utility>
+#include <vector>
 
 using std::int8_t;
 using std::size_t;
@@ -40,16 +42,7 @@ namespace Esterv::Utils::QrGen {
 
 /*---- Class QrSegment ----*/
 
-QrSegment::Mode::Mode(int mode, int cc0, int cc1, int cc2) : modeBits(mode) {
-  numBitsCharCount[0] = cc0;
-  numBitsCharCount[1] = cc1;
-  numBitsCharCount[2] = cc2;
-}
-
-int QrSegment::Mode::getModeBits() const { return modeBits; }
-
-int QrSegment::Mode::numCharCountBits(int ver) const {
-  return numBitsCharCount[(ver + 7) / 17];
+QrSegment::Mode::Mode(int mode, int cc0, int cc1, int cc2) : mode_bits_(mode), k_num_bits_char_count{cc0,cc1,cc2}{
 }
 
 const QrSegment::Mode QrSegment::Mode::NUMERIC(0x1, 10, 12, 14);
@@ -130,7 +123,7 @@ vector<QrSegment> QrSegment::makeSegments(const char *text) {
   return result;
 }
 
-QrSegment QrSegment::makeEci(long assignVal) {
+QrSegment QrSegment::makeEci(int64_t assignVal) {
   BitBuffer bb;
   if (assignVal < 0)
     throw std::domain_error("ECI assignment value out of range");
@@ -184,7 +177,7 @@ bool QrSegment::isNumeric(const char *text) {
   return true;
 }
 
-bool QrSegment::isAlphanumeric(const char *text) {
+auto QrSegment::isAlphanumeric(const char *text) -> bool {
   for (; *text != '\0'; text++) {
     if (std::strchr(ALPHANUMERIC_CHARSET, *text) == nullptr)
       return false;
@@ -194,9 +187,9 @@ bool QrSegment::isAlphanumeric(const char *text) {
 
 const QrSegment::Mode &QrSegment::getMode() const { return *mode; }
 
-int QrSegment::getNumChars() const { return numChars; }
+auto QrSegment::getNumChars() const -> int { return numChars; }
 
-const std::vector<bool> &QrSegment::getData() const { return data; }
+
 
 const char *QrSegment::ALPHANUMERIC_CHARSET =
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
@@ -218,20 +211,20 @@ int QrCode::getFormatBits(Ecc ecl) {
   }
 }
 
-QrCode QrCode::encodeText(const char *text, Ecc ecl) {
+auto QrCode::encodeText(const char *text, Ecc ecl) -> QrCode {
 
-  vector<QrSegment> segs = QrSegment::makeSegments(text);
-  return encodeSegments(segs, ecl);
+  vector<QrSegment> const ksegs = QrSegment::makeSegments(text);
+  return encodeSegments(ksegs, ecl);
 }
 
-QrCode QrCode::encodeBinary(const vector<uint8_t> &data, Ecc ecl) {
-  vector<QrSegment> segs{QrSegment::makeBytes(data)};
-  return encodeSegments(segs, ecl);
+auto QrCode::encodeBinary(const vector<uint8_t> &data, Ecc ecl) -> QrCode {
+  vector<QrSegment> const ksegs{QrSegment::makeBytes(data)};
+  return encodeSegments(ksegs, ecl);
 }
 
-QrCode QrCode::encodeSegments(const vector<QrSegment> &segs, Ecc ecl,
+auto QrCode::encodeSegments(const vector<QrSegment> &segs, Ecc ecl,
                               int minVersion, int maxVersion, int mask,
-                              bool boostEcl) {
+                              bool boostEcl) -> QrCode {
   if (!(MIN_VERSION <= minVersion && minVersion <= maxVersion &&
         maxVersion <= MAX_VERSION) ||
       mask < -1 || mask > 7)
@@ -261,10 +254,10 @@ QrCode QrCode::encodeSegments(const vector<QrSegment> &segs, Ecc ecl,
 
   // Increase the error correction level while the data still fits in the
   // current version number
-  for (Ecc newEcl :
+  for (Ecc const knewEcl :
        {Ecc::MEDIUM, Ecc::QUARTILE, Ecc::HIGH}) { // From low to high
-    if (boostEcl && dataUsedBits <= getNumDataCodewords(version, newEcl) * 8)
-      ecl = newEcl;
+    if (boostEcl && dataUsedBits <= getNumDataCodewords(version, knewEcl) * 8)
+      ecl = knewEcl;
   }
 
   // Concatenate all segments to create the data bit string
@@ -278,7 +271,7 @@ QrCode QrCode::encodeSegments(const vector<QrSegment> &segs, Ecc ecl,
   assert(bb.size() == static_cast<unsigned int>(dataUsedBits));
 
   // Add terminator and pad up to a byte if applicable
-  size_t dataCapacityBits =
+  size_t const dataCapacityBits =
       static_cast<size_t>(getNumDataCodewords(version, ecl)) * 8;
   assert(bb.size() <= dataCapacityBits);
   bb.appendBits(0, std::min(4, static_cast<int>(dataCapacityBits - bb.size())));
@@ -302,10 +295,12 @@ QrCode QrCode::encodeSegments(const vector<QrSegment> &segs, Ecc ecl,
 QrCode::QrCode(int ver, Ecc ecl, const vector<uint8_t> &dataCodewords, int msk)
     : // Initialize fields and check arguments
       version(ver), errorCorrectionLevel(ecl) {
-  if (ver < MIN_VERSION || ver > MAX_VERSION)
+  if (ver < MIN_VERSION || ver > MAX_VERSION){
     throw std::domain_error("Version value out of range");
-  if (msk < -1 || msk > 7)
+  }
+  if (msk < -1 || msk > 7) {
     throw std::domain_error("Mask value out of range");
+  }
   size = ver * 4 + 17;
   size_t sz = static_cast<size_t>(size);
   modules = vector<vector<bool>>(sz, vector<bool>(sz)); // Initially all light
@@ -339,7 +334,7 @@ QrCode::QrCode(int ver, Ecc ecl, const vector<uint8_t> &dataCodewords, int msk)
   isFunction.shrink_to_fit();
 }
 
-int QrCode::getVersion() const { return version; }
+
 
 int QrCode::getSize() const { return size; }
 
