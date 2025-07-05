@@ -5,10 +5,12 @@ else()
 endif(EMSCRIPTEN)
 
 if(Qt6_FOUND AND TARGET QrDec)
+  qt_policy(SET QTP0004 NEW)
+
   FetchContent_Declare(
     EstervDesigns
     GIT_REPOSITORY https://github.com/EddyTheCo/Esterv.Designs.git
-    GIT_TAG v2.0.0
+    GIT_TAG improvements 
     FIND_PACKAGE_ARGS 2 COMPONENTS SimpleStyle CustomControls CONFIG)
   FetchContent_MakeAvailable(EstervDesigns)
   qt_standard_project_setup()
