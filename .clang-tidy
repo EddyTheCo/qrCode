@@ -1,0 +1,43 @@
+---
+# .clang-tidy configuration for Qt6 and QML projects
+# This configuration balances code quality checks with Qt-specific patterns
+
+Checks: >
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  google-*,
+  hicpp-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+
+CheckOptions:
+  # Naming conventions adapted for Qt style
+  readability-identifier-naming.VariableCase: lower_case
+  readability-identifier-naming.FunctionCase: camelCase
+  readability-identifier-naming.MethodCase: camelCase
+  readability-identifier-naming.ParameterCase: lower_case
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.EnumConstantCase: CamelCase
+  readability-identifier-naming.NamespaceCase: CamelCase
+  readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  readability-identifier-naming.MemberCase: lower_case
+  readability-identifier-naming.PrivateMemberCase: lower_case
+  readability-identifier-naming.PrivateMemberSuffix: _
+  readability-identifier-naming.ProtectedMemberCase: lower_case
+  readability-identifier-naming.ProtectedMemberSuffix: _
+  readability-identifier-naming.PublicMemberCase: lower_case
+
+# Warning options
+WarningsAsErrors: ''
+# Use .clang-format file if available
+FormatStyle: file
+
+
+UseColor: true
