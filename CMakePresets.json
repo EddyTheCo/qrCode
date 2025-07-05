@@ -6,7 +6,7 @@
       "displayName": "Default Release",
       "description": "Release Static library using Ninja generator",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/release",
+      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "REPO_URL": "https://eddytheco.github.io/Esterv.Utils.QrCode"
@@ -20,7 +20,8 @@
       "cacheVariables": {
         "BUILD_DOCS": "ON",
         "BUILD_EXAMPLES": "ON",
-        "QTDEPLOY": "ON"
+        "QTDEPLOY": "ON",
+	"CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
     },
     {
@@ -28,7 +29,6 @@
       "displayName": "Default Config for development(Debug)",
       "description": "Debug build type using Ninja generator",
       "inherits": "default-develop",
-      "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
