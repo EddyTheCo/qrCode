@@ -1,4 +1,4 @@
-add_library(QrGen src/qrcode_gen.cpp src/utils.cpp)
+add_library(QrGen src/qrcode_gen.cpp src/utils.cpp include/esterv/utils/qrcode_gen.hpp)
 add_library(Esterv::QrGen ALIAS QrGen)
 
 set_target_properties(QrGen PROPERTIES POSITION_INDEPENDENT_CODE ON)

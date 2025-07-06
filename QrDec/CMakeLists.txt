@@ -63,7 +63,7 @@ if(NOT OpenCV_FOUND AND OpenCV_DOWNLOAD)
 endif()
 
 if(OpenCV_FOUND)
-  add_library(QrDec src/qrcode_dec.cpp)
+  add_library(QrDec src/qrcode_dec.cpp include/esterv/utils/qrcode_dec.hpp)
 
   add_library(Esterv::QrDec ALIAS QrDec)
   set_target_properties(QrDec PROPERTIES VERSION ${VERSION} SOVERSION
